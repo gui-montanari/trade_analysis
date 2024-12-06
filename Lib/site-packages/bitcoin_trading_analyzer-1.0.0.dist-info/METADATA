@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: bitcoin_trading_analyzer
+Version: 1.0.0
+Requires-Dist: PyQt5
+Requires-Dist: numpy
+Requires-Dist: pandas
+Requires-Dist: scikit-learn
+Requires-Dist: requests

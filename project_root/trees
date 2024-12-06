@@ -1,0 +1,77 @@
+project_root/
+│
+├── src/
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── data/
+│   │   │   ├── __init__.py
+│   │   │   ├── market_data.py        # Modelo de dados de mercado
+│   │   │   └── historical_data.py    # Dados históricos e cache
+│   │   │
+│   │   ├── analysis/
+│   │   │   ├── __init__.py
+│   │   │   ├── technical_indicators.py # Indicadores técnicos avançados
+│   │   │   ├── pattern_recognition.py  # Reconhecimento de padrões
+│   │   │   └── sentiment_analysis.py   # Análise de sentimento do mercado
+│   │   │
+│   │   └── trading/
+│   │       ├── __init__.py
+│   │       ├── day_trading.py         # Análise intraday
+│   │       ├── swing_trading.py       # Análise semanal
+│   │       ├── position_trading.py    # Análise mensal
+│   │       └── futures_trading.py     # Análise de futuros
+│   │
+│   ├── views/
+│   │   ├── __init__.py
+│   │   ├── components/
+│   │   │   ├── __init__.py
+│   │   │   ├── trading_buttons.py     # Botões personalizados
+│   │   │   ├── price_displays.py      # Displays de preços
+│   │   │   ├── analysis_tabs.py       # Tabs de análise
+│   │   │   └── chart_widgets.py       # Widgets de gráficos
+│   │   │
+│   │   ├── windows/
+│   │   │   ├── __init__.py
+│   │   │   ├── main_window.py        # Janela principal unificada
+│   │   │   └── settings_window.py    # Janela de configurações
+│   │   │
+│   │   └── printers/
+│   │       ├── __init__.py
+│   │       ├── day_trade_printer.py   # Formatação de análise diária
+│   │       ├── swing_printer.py       # Formatação de análise semanal
+│   │       ├── position_printer.py    # Formatação de análise mensal
+│   │       └── futures_printer.py     # Formatação de análise de futuros
+│   │
+│   ├── controllers/
+│   │   ├── __init__.py
+│   │   ├── main_controller.py        # Controlador principal
+│   │   ├── market_controller.py      # Controlador de dados de mercado
+│   │   └── trading_controller.py     # Controlador de operações
+│   │
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── api_service.py           # Serviço de API
+│   │   ├── risk_manager.py         # Gerenciamento de risco
+│   │   └── signal_generator.py     # Gerador de sinais de trading
+│   │
+│   └── utils/
+│       ├── __init__.py
+│       ├── config.py               # Configurações
+│       ├── constants.py            # Constantes
+│       └── validators.py           # Validadores
+│
+├── tests/
+│   ├── __init__.py
+│   ├── test_models/
+│   ├── test_controllers/
+│   ├── test_services/
+│   └── test_views/
+│
+├── assets/
+│   └── fonts/
+│       ├── Roboto-Regular.ttf
+│       └── Consolas.ttf
+│
+├── main.py
+├── requirements.txt
+└── README.md
