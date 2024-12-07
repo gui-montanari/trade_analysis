@@ -30,12 +30,16 @@ class MarketDataModel:
             
             # Then get Bitcoin specific data
             coin_data = self._fetch_coin_data()
+            
+            # Get volume change data
+            volume_change = self._fetch_volume_change()
 
             # Combine the data
             result = {
                 'price': coin_data.get('price', 0),
                 'change_24h': coin_data.get('change_24h', 0),
                 'volume_24h': coin_data.get('total_volume', {}).get('usd', 0),
+                'volume_change_24h': volume_change,
                 'market_cap': coin_data.get('market_cap', {}).get('usd', 0),
                 'high_24h': coin_data.get('high_24h', {}).get('usd', 0),
                 'low_24h': coin_data.get('low_24h', {}).get('usd', 0),
@@ -88,6 +92,34 @@ class MarketDataModel:
             logging.error(f"Error fetching coin data: {str(e)}")
             return {}
 
+    def _fetch_volume_change(self) -> float:
+        """Fetch and calculate 24h volume change percentage"""
+        try:
+            self._wait_for_api_limit()
+            response = requests.get(
+                f"{self.base_url}/coins/bitcoin/market_chart",
+                headers=self.headers,
+                params={
+                    'vs_currency': 'usd',
+                    'days': '1',
+                    'interval': 'hourly'
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            if 'total_volumes' in data and len(data['total_volumes']) >= 2:
+                volumes = [v[1] for v in data['total_volumes']]
+                current_volume = volumes[-1]
+                previous_volume = volumes[0]
+                if previous_volume > 0:
+                    return ((current_volume - previous_volume) / previous_volume) * 100
+            return 0
+            
+        except Exception as e:
+            logging.error(f"Error calculating volume change: {str(e)}")
+            return 0
+
     def _load_cache(self) -> Dict:
         if not self.cache_file.exists():
             return None
@@ -124,6 +156,7 @@ class MarketDataModel:
             'price': 0,
             'change_24h': 0,
             'volume_24h': 0,
+            'volume_change_24h': 0,
             'market_cap': 0,
             'high_24h': 0,
             'low_24h': 0,

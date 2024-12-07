@@ -1,14 +1,12 @@
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                            QFrame, QLabel, QStackedWidget, QSplitter,
-                           QPushButton, QTabWidget)
+                           QPushButton, QTabWidget, QSizePolicy)
 from PyQt5.QtCore import Qt, QTimer, QTime
 from PyQt5.QtGui import QFont
 
-from ..components.trading_buttons import (FuturesButton, DayTradeButton, 
-                                        SwingButton, PositionButton, RefreshButton)
+from ..components.trading_buttons import RefreshButton
 from ..components.price_displays import PriceDisplay, DetailedPriceDisplay, MarketStatDisplay
 from ..components.analysis_tabs import AnalysisTabs
-from ..components.chart_widgets import ChartWidget
 
 class MainWindow(QMainWindow):
     def __init__(self, controller=None):
@@ -31,30 +29,8 @@ class MainWindow(QMainWindow):
             QMainWindow {
                 background-color: #1A1A1A;
             }
-            QLabel {
-                color: #FFFFFF;
-            }
-            QFrame {
-                border-radius: 10px;
-            }
-            QTabWidget::pane {
-                border: 1px solid #333333;
-                background-color: #1E1E1E;
-                border-radius: 8px;
-            }
-            QTabBar::tab {
-                background-color: #2D2D2D;
-                color: #FFFFFF;
-                padding: 8px 16px;
-                margin: 2px;
-                border-radius: 4px;
-            }
-            QTabBar::tab:selected {
-                background-color: #2962FF;
-            }
         """)
 
-        # Create central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         self.main_layout = QVBoxLayout(central_widget)
@@ -106,77 +82,84 @@ class MainWindow(QMainWindow):
         self.price_display = PriceDisplay()
         header_layout.addWidget(self.price_display)
         
-        # Add action buttons
-        button_layout = QHBoxLayout()
-        
+        # Add refresh button
         self.refresh_button = RefreshButton("Refresh")
-        button_layout.addWidget(self.refresh_button)
-        
-        header_layout.addLayout(button_layout)
+        header_layout.addWidget(self.refresh_button)
         
         self.main_layout.addWidget(header)
 
-    def setup_left_panel(self) -> QFrame:
-        """Setup left panel with market statistics"""
+    def setup_left_panel(self):
+        """Setup left panel with market overview"""
         panel = QFrame()
         panel.setStyleSheet("""
             QFrame {
                 background-color: #2D2D2D;
-                padding: 15px;
             }
         """)
+        
+        # Main layout for the panel
         layout = QVBoxLayout(panel)
+        layout.setSpacing(20)
+        layout.setContentsMargins(15, 15, 15, 15)
         
-        # Market overview title
+        # Container for all content to ensure proper sizing
+        content_container = QFrame()
+        content_layout = QVBoxLayout(content_container)
+        content_layout.setSpacing(20)
+        
+        # Market Overview Title with container
+        title_container = QFrame()
+        title_layout = QVBoxLayout(title_container)
+        
         overview_title = QLabel("Market Overview")
-        overview_title.setFont(QFont("Arial", 16, QFont.Bold))
-        layout.addWidget(overview_title)
+        overview_title.setFont(QFont("Arial", 18, QFont.Bold))
+        overview_title.setStyleSheet("color: #FFFFFF;")
+        overview_title.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        title_layout.addWidget(overview_title)
         
-        # Detailed price display
+        content_layout.addWidget(title_container)
+        
+        # Price Details Section
+        price_details_title = QLabel("Price Details")
+        price_details_title.setFont(QFont("Arial", 14, QFont.Bold))
+        price_details_title.setStyleSheet("color: #FFFFFF;")
+        content_layout.addWidget(price_details_title)
+        
         self.detailed_price = DetailedPriceDisplay()
-        layout.addWidget(self.detailed_price)
+        content_layout.addWidget(self.detailed_price)
         
-        # Market statistics
+        # Market Statistics Section
+        market_stats_title = QLabel("Market Statistics")
+        market_stats_title.setFont(QFont("Arial", 14, QFont.Bold))
+        market_stats_title.setStyleSheet("color: #FFFFFF;")
+        content_layout.addWidget(market_stats_title)
+        
         self.market_stats = MarketStatDisplay()
-        layout.addWidget(self.market_stats)
+        content_layout.addWidget(self.market_stats)
         
-        # Trading Analysis Buttons
-        analysis_frame = QFrame()
-        analysis_layout = QVBoxLayout(analysis_frame)
+        # Set size policies
+        content_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
-        analysis_title = QLabel("Trading Analysis")
-        analysis_title.setFont(QFont("Arial", 14, QFont.Bold))
-        analysis_layout.addWidget(analysis_title)
-        
-        self.futures_button = FuturesButton("Futures Analysis")
-        self.day_trade_button = DayTradeButton("Day Trading Analysis")
-        self.swing_button = SwingButton("Swing Trading Analysis")
-        self.position_button = PositionButton("Position Trading Analysis")
-        
-        analysis_layout.addWidget(self.futures_button)
-        analysis_layout.addWidget(self.day_trade_button)
-        analysis_layout.addWidget(self.swing_button)
-        analysis_layout.addWidget(self.position_button)
-        
-        layout.addWidget(analysis_frame)
-        
+        # Add the content container to the main layout
+        layout.addWidget(content_container)
         layout.addStretch()
+        
         return panel
 
-    def setup_right_panel(self) -> QFrame:
-        """Setup right panel with chart and analysis"""
+    def setup_right_panel(self):
+        """Setup right panel with analysis"""
         panel = QFrame()
         panel.setStyleSheet("""
             QFrame {
                 background-color: #2D2D2D;
-                padding: 15px;
             }
         """)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        layout.setSpacing(0)
         
-        # Analysis tabs - removido o Chart widget
+        # Analysis tabs
         self.analysis_tabs = AnalysisTabs()
         layout.addWidget(self.analysis_tabs)
         
@@ -194,8 +177,8 @@ class MainWindow(QMainWindow):
         footer_layout = QHBoxLayout(footer)
         
         # Status label
-        self.status_label = QLabel("Connected to market data")
-        self.status_label.setStyleSheet("color: #00C853;")
+        self.status_label = QLabel("Last update:")
+        self.status_label.setStyleSheet("color: #808080;")
         footer_layout.addWidget(self.status_label)
         
         # Version info
@@ -214,17 +197,11 @@ class MainWindow(QMainWindow):
     def setup_connections(self):
         """Setup signal/slot connections"""
         if self.controller:
-            # Connect refresh button
+            # Connect refresh button only
             self.refresh_button.clicked.connect(self.refresh_data)
-            
-            # Connect analysis buttons
-            self.futures_button.clicked.connect(self.run_futures_analysis)
-            self.day_trade_button.clicked.connect(self.run_day_trading_analysis)
-            self.swing_button.clicked.connect(self.run_swing_analysis)
-            self.position_button.clicked.connect(self.run_position_analysis)
 
     def refresh_data(self):
-        """Refresh all market data displays"""
+        """Refresh all market data"""
         if self.controller:
             try:
                 self.controller.update_market_data()
@@ -232,25 +209,37 @@ class MainWindow(QMainWindow):
                 self.show_error(f"Error refreshing data: {str(e)}")
         self.status_label.setText("Last update: " + QTime.currentTime().toString("hh:mm:ss"))
 
-    def run_futures_analysis(self):
-        if self.controller:
-            self.controller.run_futures_analysis()
-
-    def run_day_trading_analysis(self):
-        if self.controller:
-            self.controller.run_day_trading_analysis()
-
-    def run_swing_analysis(self):
-        if self.controller:
-            self.controller.run_swing_analysis()
-
-    def run_position_analysis(self):
-        if self.controller:
-            self.controller.run_position_analysis()
-
     def display_analysis(self, analysis_type: str, analysis_text: str):
-        """Display analysis in the appropriate tab"""
-        self.analysis_tabs.display_analysis(analysis_type, analysis_text)
+        """Display analysis in appropriate tab"""
+        try:
+            # Get the correct tab
+            if analysis_type == 'futures':
+                tab = self.analysis_tabs.futures_tab
+            elif analysis_type == 'day':
+                tab = self.analysis_tabs.day_tab
+            elif analysis_type == 'swing':
+                tab = self.analysis_tabs.swing_tab
+            elif analysis_type == 'position':
+                tab = self.analysis_tabs.position_tab
+            else:
+                return
+
+            # Display results
+            if tab and hasattr(tab, 'display_results'):
+                tab.display_results(analysis_text)
+                
+                # Switch to the selected tab
+                index_map = {
+                    'futures': 0,
+                    'day': 1,
+                    'swing': 2,
+                    'position': 3
+                }
+                self.analysis_tabs.setCurrentIndex(index_map.get(analysis_type, 0))
+                
+        except Exception as e:
+            print(f"Error in display_analysis: {str(e)}")
+            self.show_error(f"Error displaying analysis: {str(e)}")
 
     def update_price_display(self, data: dict):
         """Update all price displays with new data"""

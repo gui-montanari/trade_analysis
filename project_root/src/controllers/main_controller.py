@@ -37,11 +37,33 @@ class MainController:
         """Show the main application window"""
         self.main_window.show()
 
+    def update_price_only(self):
+        """Update only price displays without changing analysis view"""
+        try:
+            data = self.market_data.get_current_data()
+            if data['price'] > 0:
+                # Update only the price displays without running analysis
+                if hasattr(self.main_window, 'price_display'):
+                    self.main_window.price_display.update_price(data)
+                if hasattr(self.main_window, 'detailed_price'):
+                    self.main_window.detailed_price.update_prices(data)
+                if hasattr(self.main_window, 'market_stats'):
+                    self.main_window.market_stats.update_stats(data)
+                print(f"Updated market data: Price=${data['price']:,.2f}")
+        except Exception as e:
+            print(f"Error updating price: {str(e)}")
+
     def update_all_data(self):
         """Update market data and all analyses"""
         try:
             data = self.market_data.get_current_data()
             if data['price'] > 0:
+                # Store current tab before updates
+                current_tab = None
+                if hasattr(self.main_window, 'analysis_tabs'):
+                    current_tab = self.main_window.analysis_tabs.currentIndex()
+
+                # Update price display
                 self.main_window.update_price_display(data)
                 print(f"Updated market data: Price=${data['price']:,.2f}")
                 
@@ -50,6 +72,10 @@ class MainController:
                 self.run_day_trading_analysis()
                 self.run_swing_analysis()
                 self.run_position_analysis()
+
+                # Restore previous tab if it was saved
+                if current_tab is not None:
+                    self.main_window.analysis_tabs.setCurrentIndex(current_tab)
             else:
                 print("Received invalid market data")
         except Exception as e:
@@ -60,9 +86,11 @@ class MainController:
         try:
             data = self.market_data.get_current_data()
             if data['price'] > 0:
-                self.main_window.update_price_display(data)
-                self._update_chart(data)
-                print(f"Updated market data: Price=${data['price']:,.2f}")
+                # Atualiza apenas os displays de preço sem executar análises
+                if hasattr(self.main_window, 'update_price_display'):
+                    self.main_window.update_price_display(data)
+                    self._update_chart(data)
+                    print(f"Updated market data: Price=${data['price']:,.2f}")
             else:
                 print("Received invalid market data")
         except Exception as e:

@@ -8,9 +8,7 @@ class AnalysisTabs(QTabWidget):
         self.setup_ui()
         
     def setup_ui(self):
-        # Set tab position to top with minimal height
         self.setTabPosition(QTabWidget.North)
-        
         self.setStyleSheet("""
             QTabWidget::pane {
                 border: none;
@@ -52,6 +50,27 @@ class AnalysisTabs(QTabWidget):
         self.position_tab.setObjectName("position_tab")
         self.addTab(self.position_tab, "Position Trading")
 
+    def get_tab(self, tab_name: str) -> 'AnalysisTab':
+        """Get tab by name"""
+        tab_map = {
+            'futures': self.futures_tab,
+            'day': self.day_tab,
+            'swing': self.swing_tab,
+            'position': self.position_tab
+        }
+        return tab_map.get(tab_name)
+
+    def display_analysis(self, tab_name: str, analysis_text: str):
+        """Display analysis in the appropriate tab"""
+        try:
+            tab = self.get_tab(tab_name)
+            if tab:
+                tab.display_results(analysis_text)
+                self.setCurrentWidget(tab)
+        except Exception as e:
+            print(f"Error displaying analysis in tab: {str(e)}")
+
+
 class AnalysisTab(QWidget):
     def __init__(self, title: str, parent=None):
         super().__init__(parent)
@@ -63,18 +82,14 @@ class AnalysisTab(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        # Results display
-        self.results_display = QTextEdit()
-        self.results_display.setReadOnly(True)
-        self.results_display.setStyleSheet("""
-            QTextEdit {
-                background-color: #1E1E1E;
-                color: #FFFFFF;
+        # Create scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
                 border: none;
-                padding: 20px;
-                font-family: 'Consolas', monospace;
-                font-size: 14px;
-                line-height: 1.8;
+                background-color: #1E1E1E;
             }
             QScrollBar:vertical {
                 background-color: #2D2D2D;
@@ -98,37 +113,73 @@ class AnalysisTab(QWidget):
             }
         """)
         
-        # Set size policy for expanding
+        # Create content widget
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Results display
+        self.results_display = QTextEdit()
+        self.results_display.setReadOnly(True)
+        self.results_display.setStyleSheet("""
+            QTextEdit {
+                background-color: #1E1E1E;
+                color: #FFFFFF;
+                border: none;
+                padding: 20px;
+                font-family: 'Consolas', monospace;
+                font-size: 14px;
+                line-height: 1.8;
+            }
+        """)
+        
+        # Configure size policy
         self.results_display.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.results_display.setMinimumHeight(800)
         
-        # Make text edit take full available space
-        self.results_display.setMinimumHeight(700)
+        # Add results display to content layout
+        content_layout.addWidget(self.results_display)
         
-        layout.addWidget(self.results_display)
+        # Set the content widget to the scroll area
+        scroll_area.setWidget(content_widget)
+        
+        # Add scroll area to main layout
+        layout.addWidget(scroll_area)
         
     def display_results(self, text: str):
+        """Display analysis results"""
         try:
-            # Remove redundant market overview section
+            if not text:
+                self.results_display.setPlainText("No analysis available")
+                return
+                
+            # Remove redundant sections
             sections = text.split("\n\n")
             filtered_sections = []
-            skip_section = False
             
             for section in sections:
-                if "Analysis Time:" in section:
+                # Skip timestamp and market overview sections
+                if "Analysis Time:" in section or "MARKET OVERVIEW" in section:
                     continue
-                if "MARKET OVERVIEW" in section:
-                    skip_section = True
+                if any(section.startswith(header) for header in [
+                    "Current Price:", "24h Change:", "24h Volume:", 
+                    "Market Cap:", "24h High:", "24h Low:"
+                ]):
                     continue
-                if skip_section:
-                    if section.strip() and not any(section.startswith(header) for header in ["Current Price:", "24h Change:", "24h Volume:", "Market Cap:", "24h High:", "24h Low:"]):
-                        skip_section = False
-                if not skip_section:
-                    filtered_sections.append(section)
+                    
+                # Add non-redundant sections
+                if section.strip():
+                    filtered_sections.append(section.strip())
             
             # Join remaining sections
             filtered_text = "\n\n".join(filtered_sections)
             
-            self.results_display.setPlainText(filtered_text)
+            if filtered_text:
+                self.results_display.setPlainText(filtered_text)
+            else:
+                self.results_display.setPlainText("No analysis data available")
+                
+            # Reset scroll position
             self.results_display.verticalScrollBar().setValue(0)
             
         except Exception as e:
@@ -136,5 +187,6 @@ class AnalysisTab(QWidget):
             self.results_display.setPlainText(f"Error displaying analysis: {str(e)}")
 
     def clear_results(self):
+        """Clear the analysis results"""
         self.results_display.clear()
         self.results_display.setPlainText(f"Loading {self.title}...")
