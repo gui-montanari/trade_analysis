@@ -1,0 +1,36 @@
+# Ignorar arquivos específicos
+market_data_cache.json
+ClaudeAI.txt
+
+# Ignorar diretórios
+Lib/
+Scripts/
+project_root/cache/
+
+# Ignorar ambientes virtuais
+pyvenv.cfg
+
+# Ignorar arquivos compilados do Python
+*.pyc
+*.pyo
+*.pyd
+
+# Ignorar caches do Python (recursivamente)
+**/__pycache__/
+
+# Excluir pacotes do site-packages de bibliotecas instaladas
+site-packages/
+
+# Ignorar outros arquivos e diretórios de compilação
+.DS_Store
+Thumbs.db
+
+# Ignorar logs e temporários (opcional, se aplicável)
+*.log
+*.tmp
+*.bak
+
+# Ignorar configurações específicas de editores/IDEs (opcional)
+.vscode/
+.idea/
+*.swp
