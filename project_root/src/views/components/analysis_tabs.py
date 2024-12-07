@@ -1,9 +1,6 @@
-from PyQt5.QtWidgets import (QTabWidget, QWidget, QVBoxLayout, QHBoxLayout, 
-                           QLabel, QFrame, QTextEdit, QScrollArea)
+from PyQt5.QtWidgets import (QTabWidget, QWidget, QVBoxLayout, QTextEdit, 
+                           QScrollArea, QFrame, QSizePolicy)
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
-from .trading_buttons import (FuturesButton, DayTradeButton, 
-                            SwingButton, PositionButton, RefreshButton)
 
 class AnalysisTabs(QTabWidget):
     def __init__(self, parent=None):
@@ -11,12 +8,16 @@ class AnalysisTabs(QTabWidget):
         self.setup_ui()
         
     def setup_ui(self):
-        # Set tab style
+        # Set tab position to top with minimal height
+        self.setTabPosition(QTabWidget.North)
+        
         self.setStyleSheet("""
             QTabWidget::pane {
-                border: 1px solid #333333;
+                border: none;
                 background-color: #1E1E1E;
-                border-radius: 8px;
+            }
+            QTabWidget {
+                background-color: #1E1E1E;
             }
             QTabBar::tab {
                 background-color: #2D2D2D;
@@ -24,45 +25,43 @@ class AnalysisTabs(QTabWidget):
                 padding: 8px 16px;
                 margin: 2px;
                 border-radius: 4px;
+                min-width: 120px;
+            }
+            QTabBar::tab:hover {
+                background-color: #3D3D3D;
             }
             QTabBar::tab:selected {
                 background-color: #2962FF;
             }
         """)
         
-        # Add analysis tabs
-        self.addTab(FuturesAnalysisTab(), "Futures Trading")
-        self.addTab(DayTradingAnalysisTab(), "Day Trading")
-        self.addTab(SwingAnalysisTab(), "Swing Trading")
-        self.addTab(PositionAnalysisTab(), "Position Trading")
+        # Create tabs with unique object names
+        self.futures_tab = AnalysisTab("Futures Analysis")
+        self.futures_tab.setObjectName("futures_tab")
+        self.addTab(self.futures_tab, "Futures Trading")
+        
+        self.day_tab = AnalysisTab("Day Trading Analysis")
+        self.day_tab.setObjectName("day_tab")
+        self.addTab(self.day_tab, "Day Trading")
+        
+        self.swing_tab = AnalysisTab("Swing Trading Analysis")
+        self.swing_tab.setObjectName("swing_tab")
+        self.addTab(self.swing_tab, "Swing Trading")
+        
+        self.position_tab = AnalysisTab("Position Trading Analysis")
+        self.position_tab.setObjectName("position_tab")
+        self.addTab(self.position_tab, "Position Trading")
 
-class BaseAnalysisTab(QWidget):
-    def __init__(self, parent=None):
+class AnalysisTab(QWidget):
+    def __init__(self, title: str, parent=None):
         super().__init__(parent)
-        self.setup_base_ui()
+        self.title = title
+        self.setup_ui()
         
-    def setup_base_ui(self):
+    def setup_ui(self):
         layout = QVBoxLayout(self)
-        
-        # Control panel
-        control_panel = QFrame()
-        control_panel.setStyleSheet("""
-            QFrame {
-                background-color: #2D2D2D;
-                border-radius: 8px;
-                padding: 15px;
-            }
-        """)
-        control_layout = QVBoxLayout(control_panel)
-        
-        # Add buttons
-        self.setup_control_buttons(control_layout)
-        
-        # Add refresh button
-        refresh_button = RefreshButton()
-        control_layout.addWidget(refresh_button)
-        
-        control_layout.addStretch()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         
         # Results display
         self.results_display = QTextEdit()
@@ -71,38 +70,71 @@ class BaseAnalysisTab(QWidget):
             QTextEdit {
                 background-color: #1E1E1E;
                 color: #FFFFFF;
-                border: 1px solid #333333;
-                padding: 15px;
-                border-radius: 8px;
-                font-family: 'Consolas';
+                border: none;
+                padding: 20px;
+                font-family: 'Consolas', monospace;
                 font-size: 14px;
-                line-height: 1.6;
+                line-height: 1.8;
+            }
+            QScrollBar:vertical {
+                background-color: #2D2D2D;
+                width: 12px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #4A4A4A;
+                min-height: 30px;
+                border-radius: 6px;
+                margin: 2px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: #555555;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
             }
         """)
         
-        # Layout configuration
-        layout.addWidget(control_panel, stretch=1)
-        layout.addWidget(self.results_display, stretch=3)
+        # Set size policy for expanding
+        self.results_display.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
-    def setup_control_buttons(self, layout):
-        pass  # To be implemented by subclasses
+        # Make text edit take full available space
+        self.results_display.setMinimumHeight(700)
+        
+        layout.addWidget(self.results_display)
+        
+    def display_results(self, text: str):
+        try:
+            # Remove redundant market overview section
+            sections = text.split("\n\n")
+            filtered_sections = []
+            skip_section = False
+            
+            for section in sections:
+                if "Analysis Time:" in section:
+                    continue
+                if "MARKET OVERVIEW" in section:
+                    skip_section = True
+                    continue
+                if skip_section:
+                    if section.strip() and not any(section.startswith(header) for header in ["Current Price:", "24h Change:", "24h Volume:", "Market Cap:", "24h High:", "24h Low:"]):
+                        skip_section = False
+                if not skip_section:
+                    filtered_sections.append(section)
+            
+            # Join remaining sections
+            filtered_text = "\n\n".join(filtered_sections)
+            
+            self.results_display.setPlainText(filtered_text)
+            self.results_display.verticalScrollBar().setValue(0)
+            
+        except Exception as e:
+            print(f"Error displaying results: {str(e)}")
+            self.results_display.setPlainText(f"Error displaying analysis: {str(e)}")
 
-class FuturesAnalysisTab(BaseAnalysisTab):
-    def setup_control_buttons(self, layout):
-        analyze_button = FuturesButton("Analyze Futures")
-        layout.addWidget(analyze_button)
-
-class DayTradingAnalysisTab(BaseAnalysisTab):
-    def setup_control_buttons(self, layout):
-        analyze_button = DayTradeButton("Analyze Day Trading")
-        layout.addWidget(analyze_button)
-
-class SwingAnalysisTab(BaseAnalysisTab):
-    def setup_control_buttons(self, layout):
-        analyze_button = SwingButton("Analyze Swing Trading")
-        layout.addWidget(analyze_button)
-
-class PositionAnalysisTab(BaseAnalysisTab):
-    def setup_control_buttons(self, layout):
-        analyze_button = PositionButton("Analyze Position Trading")
-        layout.addWidget(analyze_button)
+    def clear_results(self):
+        self.results_display.clear()
+        self.results_display.setPlainText(f"Loading {self.title}...")

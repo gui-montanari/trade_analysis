@@ -1,18 +1,7 @@
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 from dataclasses import dataclass
 import numpy as np
-from datetime import datetime, timedelta
-
-@dataclass
-class RiskAssessment:
-    risk_score: float  # 1-10 scale
-    max_position_size: float  # % of portfolio
-    recommended_leverage: int
-    stop_loss_price: float
-    liquidation_price: float
-    risk_reward_ratio: float
-    max_drawdown: float
-    recommendations: str
+from datetime import datetime
 
 class RiskManager:
     def __init__(self):
@@ -21,183 +10,151 @@ class RiskManager:
         self.min_risk_reward = 2.0      # Minimum risk/reward ratio
         self.max_leverage = 10          # Maximum allowed leverage
         
-    def assess_trade(self, analysis: Dict, timeframe: str) -> RiskAssessment:
-        """
-        Assess trade risk and generate recommendations
-        
-        Args:
-            analysis: Dictionary containing market analysis
-            timeframe: Trading timeframe (futures, day, swing, position)
-        """
+    def assess_trade(self, signal, timeframe: str) -> Dict:
+        """Assess trade risk and generate recommendations"""
         try:
-            # Calculate base risk metrics
-            risk_score = self._calculate_risk_score(analysis)
-            position_size = self._calculate_position_size(analysis, risk_score)
-            leverage = self._calculate_safe_leverage(analysis, timeframe)
+            if signal is None:
+                return self._get_default_risk_assessment()
+
+            # Calculate risk metrics
+            risk_score = self._calculate_risk_score(signal)
+            position_size = self._calculate_position_size(signal, risk_score)
+            leverage = self._calculate_safe_leverage(timeframe)
+            risk_reward = self._calculate_risk_reward(signal)
             
-            # Calculate price levels
-            stop_loss = self._calculate_stop_loss(analysis)
-            liquidation = self._calculate_liquidation_price(analysis, leverage)
-            
-            # Calculate ratios and metrics
-            risk_reward = self._calculate_risk_reward_ratio(analysis)
-            max_drawdown = self._calculate_max_drawdown(analysis)
+            # Calculate potential profit and loss
+            potential_profit = self._calculate_potential_profit(signal, leverage)
+            max_loss = self._calculate_max_loss(signal, leverage)
             
             # Generate recommendations
             recommendations = self._generate_recommendations(
-                risk_score, position_size, leverage, analysis
+                signal, risk_score, leverage, timeframe
             )
             
-            return RiskAssessment(
-                risk_score=risk_score,
-                max_position_size=position_size,
-                recommended_leverage=leverage,
-                stop_loss_price=stop_loss,
-                liquidation_price=liquidation,
-                risk_reward_ratio=risk_reward,
-                max_drawdown=max_drawdown,
-                recommendations=recommendations
-            )
+            return {
+                'risk_score': risk_score,
+                'position_size': position_size,
+                'recommended_leverage': leverage,
+                'risk_reward_ratio': risk_reward,
+                'potential_profit': potential_profit,
+                'max_loss': max_loss,
+                'recommendations': recommendations
+            }
             
         except Exception as e:
-            raise Exception(f"Error in risk assessment: {str(e)}")
+            print(f"Error in risk assessment: {str(e)}")
+            return self._get_default_risk_assessment()
 
-    def _calculate_risk_score(self, analysis: Dict) -> float:
-        """Calculate overall risk score (1-10)"""
-        score = 5.0  # Base score
+    def _calculate_risk_score(self, signal) -> float:
+        """Calculate risk score (1-10)"""
+        base_score = 5.0
         
-        # Adjust based on volatility
-        if 'volatility' in analysis:
-            vol_score = min(analysis['volatility'] / 10, 3)
-            score += vol_score
-            
-        # Adjust based on trend strength
-        if 'trend_strength' in analysis:
-            if analysis['trend_strength'] > 0.7:
-                score -= 1
-            elif analysis['trend_strength'] < 0.3:
-                score += 1
+        # Adjust based on confidence
+        if hasattr(signal, 'confidence'):
+            confidence_factor = (100 - signal.confidence) / 20
+            base_score += confidence_factor
+        
+        # Adjust based on risk/reward
+        if hasattr(signal, 'take_profit') and hasattr(signal, 'stop_loss'):
+            risk_reward = abs(signal.take_profit - signal.entry_price) / abs(signal.entry_price - signal.stop_loss)
+            if risk_reward < self.min_risk_reward:
+                base_score += 2
+            elif risk_reward > self.min_risk_reward * 1.5:
+                base_score -= 1
                 
-        # Adjust based on volume
-        if 'volume_profile' in analysis:
-            if analysis['volume_profile'] == 'increasing':
-                score -= 0.5
-            elif analysis['volume_profile'] == 'decreasing':
-                score += 0.5
-                
-        # Adjust based on market conditions
-        if 'market_conditions' in analysis:
-            if analysis['market_conditions'] == 'high_volatility':
-                score += 2
-            elif analysis['market_conditions'] == 'stable':
-                score -= 1
-                
-        return min(max(score, 1), 10)
+        return min(max(base_score, 1), 10)
 
-    def _calculate_position_size(self, analysis: Dict, risk_score: float) -> float:
-        """Calculate maximum position size as percentage of portfolio"""
+    def _calculate_position_size(self, signal, risk_score: float) -> float:
+        """Calculate recommended position size"""
         base_size = self.max_risk_per_trade * 100  # Convert to percentage
         
-        # Adjust based on risk score
-        size_multiplier = 1 - (risk_score / 20)  # Higher risk = smaller position
-        
-        # Adjust based on volatility
-        if 'volatility' in analysis:
-            vol_multiplier = 1 - (analysis['volatility'] / 200)
-            size_multiplier *= vol_multiplier
-            
-        # Calculate final position size
-        position_size = base_size * size_multiplier
-        
-        # Ensure within limits
-        return min(position_size, self.max_account_risk * 100)
+        # Reduce size based on risk score
+        risk_factor = (10 - risk_score) / 10
+        return round(base_size * risk_factor, 2)
 
-    def _calculate_safe_leverage(self, analysis: Dict, timeframe: str) -> int:
-        """Calculate safe leverage based on market conditions"""
-        max_leverage = {
+    def _calculate_safe_leverage(self, timeframe: str) -> int:
+        """Calculate safe leverage based on timeframe"""
+        max_leverages = {
             'futures': self.max_leverage,
             'day': 5,
             'swing': 3,
             'position': 2
-        }.get(timeframe, 1)
-        
-        # Adjust based on volatility
-        if 'volatility' in analysis:
-            vol_adjustment = max(1, (30 - analysis['volatility']) / 30)
-            max_leverage = int(max_leverage * vol_adjustment)
-            
-        # Adjust based on trend strength
-        if 'trend_strength' in analysis:
-            if analysis['trend_strength'] < 0.3:
-                max_leverage = max(1, max_leverage - 2)
-                
-        return min(max_leverage, self.max_leverage)
+        }
+        return max_leverages.get(timeframe, 1)
 
-    def _calculate_stop_loss(self, analysis: Dict) -> float:
-        """Calculate optimal stop loss price"""
-        entry_price = analysis['entry_price']
-        atr = analysis.get('atr', entry_price * 0.02)  # Default to 2% if ATR not available
-        
-        if analysis['signal'] == 'long':
-            return entry_price - (atr * 1.5)
-        else:
-            return entry_price + (atr * 1.5)
-
-    def _calculate_liquidation_price(self, analysis: Dict, leverage: int) -> float:
-        """Calculate liquidation price based on leverage"""
-        entry_price = analysis['entry_price']
-        margin = 1 / leverage
-        
-        if analysis['signal'] == 'long':
-            return entry_price * (1 - margin)
-        else:
-            return entry_price * (1 + margin)
-
-    def _calculate_risk_reward_ratio(self, analysis: Dict) -> float:
+    def _calculate_risk_reward(self, signal) -> float:
         """Calculate risk/reward ratio"""
-        entry = analysis['entry_price']
-        target = analysis['take_profit']
-        stop = analysis['stop_loss']
+        if not all(hasattr(signal, attr) for attr in ['entry_price', 'take_profit', 'stop_loss']):
+            return 0.0
+            
+        potential_profit = abs(signal.take_profit - signal.entry_price)
+        potential_loss = abs(signal.entry_price - signal.stop_loss)
         
-        reward = abs(target - entry)
-        risk = abs(stop - entry)
-        
-        return reward / risk if risk > 0 else 0
+        return round(potential_profit / potential_loss if potential_loss > 0 else 0, 2)
 
-    def _calculate_max_drawdown(self, analysis: Dict) -> float:
-        """Calculate potential maximum drawdown"""
-        if 'historical_prices' in analysis:
-            prices = analysis['historical_prices']
-            peak = max(prices)
-            trough = min(prices)
-            return (peak - trough) / peak * 100
-        return 0.0
+    def _calculate_potential_profit(self, signal, leverage: int) -> float:
+        """Calculate potential profit percentage"""
+        if not all(hasattr(signal, attr) for attr in ['entry_price', 'take_profit']):
+            return 0.0
+            
+        return round(((signal.take_profit - signal.entry_price) / signal.entry_price * 100 * leverage), 2)
 
-    def _generate_recommendations(self, risk_score: float, position_size: float, 
-                                leverage: int, analysis: Dict) -> str:
+    def _calculate_max_loss(self, signal, leverage: int) -> float:
+        """Calculate maximum loss percentage"""
+        if not all(hasattr(signal, attr) for attr in ['entry_price', 'stop_loss']):
+            return 0.0
+            
+        return round(((signal.entry_price - signal.stop_loss) / signal.entry_price * 100 * leverage), 2)
+
+    def _generate_recommendations(self, signal, risk_score: float, leverage: int, timeframe: str) -> str:
         """Generate risk management recommendations"""
-        recommendations = []
+        recs = []
+        
+        # Entry recommendations
+        if hasattr(signal, 'direction'):
+            recs.append(f"• Recommended {signal.direction.upper()} entry near ${signal.entry_price:,.2f}")
         
         # Position size recommendations
-        recommendations.append(f"Recommended position size: {position_size:.1f}% of portfolio")
+        recs.append(f"• Use maximum position size of {self._calculate_position_size(signal, risk_score):.1f}% of account")
         
         # Leverage recommendations
-        if leverage > 1:
-            recommendations.append(f"Maximum safe leverage: {leverage}x")
-            recommendations.append("Consider lower leverage in volatile conditions")
+        if timeframe == 'futures':
+            recs.append(f"• Recommended leverage: {leverage}x")
+            if risk_score > 7:
+                recs.append("• Consider reducing leverage due to high risk")
         
-        # Risk score recommendations
-        if risk_score >= 8:
-            recommendations.append("⚠️ HIGH RISK - Consider reducing position size")
-        elif risk_score >= 6:
-            recommendations.append("⚠️ MODERATE RISK - Monitor position closely")
-            
-        # Volatility recommendations
-        if 'volatility' in analysis and analysis['volatility'] > 30:
-            recommendations.append("High volatility - Consider wider stops")
-            
-        # Additional recommendations
-        if analysis.get('market_conditions') == 'high_volatility':
-            recommendations.append("Use scaling in/out strategy")
+        # Stop loss recommendations
+        if hasattr(signal, 'stop_loss'):
+            recs.append(f"• Place stop loss at ${signal.stop_loss:,.2f}")
         
-        return "\n".join(recommendations)
+        # Take profit recommendations
+        if hasattr(signal, 'take_profit'):
+            recs.append(f"• Set take profit target at ${signal.take_profit:,.2f}")
+        
+        # Additional recommendations based on timeframe
+        if timeframe == 'futures':
+            recs.append("• Monitor funding rates")
+            recs.append("• Consider using trailing stops")
+        elif timeframe == 'day':
+            recs.append("• Close position before market close")
+            recs.append("• Monitor intraday support/resistance levels")
+        elif timeframe == 'swing':
+            recs.append("• Consider scaling in/out of position")
+            recs.append("• Monitor daily and 4h timeframes")
+        else:  # position
+            recs.append("• Monitor weekly and monthly trends")
+            recs.append("• Consider dollar-cost averaging")
+        
+        return "\n".join(recs)
+
+    def _get_default_risk_assessment(self) -> Dict:
+        """Return default risk assessment"""
+        return {
+            'risk_score': 10,
+            'position_size': 0,
+            'recommended_leverage': 1,
+            'risk_reward_ratio': 0,
+            'potential_profit': 0,
+            'max_loss': 0,
+            'recommendations': "Unable to generate recommendations due to insufficient data"
+        }

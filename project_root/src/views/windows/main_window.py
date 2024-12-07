@@ -173,14 +173,12 @@ class MainWindow(QMainWindow):
             }
         """)
         layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
         
-        # Chart area
-        self.chart = ChartWidget()
-        layout.addWidget(self.chart, stretch=2)
-        
-        # Analysis tabs
+        # Analysis tabs - removido o Chart widget
         self.analysis_tabs = AnalysisTabs()
-        layout.addWidget(self.analysis_tabs, stretch=3)
+        layout.addWidget(self.analysis_tabs)
         
         return panel
 
@@ -220,10 +218,10 @@ class MainWindow(QMainWindow):
             self.refresh_button.clicked.connect(self.refresh_data)
             
             # Connect analysis buttons
-            self.futures_button.clicked.connect(self.controller.run_futures_analysis)
-            self.day_trade_button.clicked.connect(self.controller.run_day_trading_analysis)
-            self.swing_button.clicked.connect(self.controller.run_swing_analysis)
-            self.position_button.clicked.connect(self.controller.run_position_analysis)
+            self.futures_button.clicked.connect(self.run_futures_analysis)
+            self.day_trade_button.clicked.connect(self.run_day_trading_analysis)
+            self.swing_button.clicked.connect(self.run_swing_analysis)
+            self.position_button.clicked.connect(self.run_position_analysis)
 
     def refresh_data(self):
         """Refresh all market data displays"""
@@ -234,35 +232,43 @@ class MainWindow(QMainWindow):
                 self.show_error(f"Error refreshing data: {str(e)}")
         self.status_label.setText("Last update: " + QTime.currentTime().toString("hh:mm:ss"))
 
-    def update_price_display(self, price_data: dict):
+    def run_futures_analysis(self):
+        if self.controller:
+            self.controller.run_futures_analysis()
+
+    def run_day_trading_analysis(self):
+        if self.controller:
+            self.controller.run_day_trading_analysis()
+
+    def run_swing_analysis(self):
+        if self.controller:
+            self.controller.run_swing_analysis()
+
+    def run_position_analysis(self):
+        if self.controller:
+            self.controller.run_position_analysis()
+
+    def display_analysis(self, analysis_type: str, analysis_text: str):
+        """Display analysis in the appropriate tab"""
+        self.analysis_tabs.display_analysis(analysis_type, analysis_text)
+
+    def update_price_display(self, data: dict):
         """Update all price displays with new data"""
         try:
-            self.price_display.update_price(
-                price_data['price'],
-                price_data.get('change_24h', 0)
-            )
+            # Update main price display
+            if hasattr(self, 'price_display'):
+                self.price_display.update_price(data)
             
-            self.detailed_price.update_prices(
-                price_data['price'],
-                price_data.get('high_24h', 0),
-                price_data.get('low_24h', 0)
-            )
+            # Update detailed price display
+            if hasattr(self, 'detailed_price'):
+                self.detailed_price.update_prices(data)
             
-            self.market_stats.update_stats(
-                price_data.get('volume_24h', 0),
-                price_data.get('market_cap', 0),
-                price_data.get('btc_dominance', 0)
-            )
-            
+            # Update market statistics
+            if hasattr(self, 'market_stats'):
+                self.market_stats.update_stats(data)
+                
         except Exception as e:
             self.show_error(f"Error updating displays: {str(e)}")
-
-    def display_analysis_results(self, analysis_type: str, results: dict):
-        """Display analysis results in appropriate tab"""
-        try:
-            self.analysis_tabs.display_results(analysis_type, results)
-        except Exception as e:
-            self.show_error(f"Error displaying analysis results: {str(e)}")
 
     def show_error(self, message: str):
         """Display error message"""

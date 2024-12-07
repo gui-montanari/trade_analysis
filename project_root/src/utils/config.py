@@ -85,48 +85,48 @@ class Config:
         config[keys[-1]] = value
         self.save_config()
 
-def setup_application(app: QApplication):
-    """Setup application-wide configurations"""
-    # Set application style
-    app.setStyle('Fusion')
-    
-    # Load and set fonts
-    font_db = QFontDatabase()
-    font_path = Path("src/assets/fonts")
-    
-    for font_file in ['Roboto-Regular.ttf', 'Consolas.ttf']:
-        try:
-            font_db.addApplicationFont(str(font_path / font_file))
-        except:
-            pass
+    def setup_application(app: QApplication):
+        """Setup application-wide configurations"""
+        # Set application style
+        app.setStyle('Fusion')
+        
+        # Load and set fonts
+        font_db = QFontDatabase()
+        font_path = Path("src/assets/fonts")
+        
+        for font_file in ['Roboto-Regular.ttf', 'Consolas.ttf']:
+            try:
+                font_db.addApplicationFont(str(font_path / font_file))
+            except:
+                pass
 
-    # Set default font
-    app.setFont(QFont("Roboto", 10))
-    
-    # Set application-wide stylesheet
-    app.setStyleSheet("""
-        QMainWindow {
-            background-color: #1A1A1A;
-        }
-        QLabel {
-            color: #FFFFFF;
-        }
-        QPushButton {
-            background-color: #2962FF;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-        }
-        QPushButton:hover {
-            background-color: #1E88E5;
-        }
-        QTextEdit {
-            background-color: #2D2D2D;
-            color: #FFFFFF;
-            border: 1px solid #333333;
-            border-radius: 4px;
-        }
-    """)
+        # Set default font
+        app.setFont(QFont("Roboto", 10))
+        
+        # Set application-wide stylesheet
+        app.setStyleSheet("""
+            QMainWindow {
+                background-color: #1A1A1A;
+            }
+            QLabel {
+                color: #FFFFFF;
+            }
+            QPushButton {
+                background-color: #2962FF;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #1E88E5;
+            }
+            QTextEdit {
+                background-color: #2D2D2D;
+                color: #FFFFFF;
+                border: 1px solid #333333;
+                border-radius: 4px;
+            }
+        """)
 
-    return app
+        return app

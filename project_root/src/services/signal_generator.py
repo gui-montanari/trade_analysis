@@ -1,298 +1,161 @@
-import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Dict
 from dataclasses import dataclass
-from datetime import datetime
 
 @dataclass
 class TradingSignal:
-    direction: str  # 'long' or 'short'
-    strength: float  # 0-1 scale
-    confidence: float  # percentage
-    probability: float  # probability of success
+    direction: str
+    strength: float
+    confidence: float
     entry_price: float
     take_profit: float
     stop_loss: float
-    timeframe: str
-    indicators: Dict
-    reasoning: List[str]
+    recommendations: list
+    analysis_details: dict
 
 class SignalGenerator:
     def __init__(self):
-        self.min_confidence = 65.0  # Minimum confidence threshold
-        self.min_strength = 0.7    # Minimum signal strength threshold
-        
-    def generate_signals(self, analysis: Dict, timeframe: str) -> Optional[TradingSignal]:
-        """
-        Generate trading signals based on technical analysis
-        
-        Args:
-            analysis: Dictionary containing market analysis
-            timeframe: Trading timeframe
-        """
+        self.min_confidence = 65.0
+        self.min_strength = 0.7
+
+    def generate_futures_signals(self, market_data: Dict) -> TradingSignal:
+        return self._generate_signal(market_data, 'futures', 0.03, 0.015)  # 3% target, 1.5% stop
+
+    def generate_day_trading_signals(self, market_data: Dict) -> TradingSignal:
+        return self._generate_signal(market_data, 'day', 0.02, 0.01)  # 2% target, 1% stop
+
+    def generate_swing_signals(self, market_data: Dict) -> TradingSignal:
+        return self._generate_signal(market_data, 'swing', 0.05, 0.025)  # 5% target, 2.5% stop
+
+    def generate_position_signals(self, market_data: Dict) -> TradingSignal:
+        return self._generate_signal(market_data, 'position', 0.15, 0.07)  # 15% target, 7% stop
+
+    def _generate_signal(self, data: Dict, trading_type: str, target_pct: float, stop_pct: float) -> TradingSignal:
         try:
-            # Calculate signal metrics
-            direction = self._determine_direction(analysis)
-            strength = self._calculate_signal_strength(analysis)
-            confidence = self._calculate_confidence(analysis)
-            probability = self._calculate_probability(analysis)
+            price = float(data['price'])
+            change_24h = float(data['change_24h'])
             
-            # If signal doesn't meet minimum criteria, return None
-            if confidence < self.min_confidence or strength < self.min_strength:
-                return None
-                
-            # Calculate price levels
-            entry_price = self._calculate_entry_price(analysis)
-            take_profit = self._calculate_take_profit(analysis, direction)
-            stop_loss = self._calculate_stop_loss(analysis, direction)
+            # Determine direction based on multiple factors
+            direction = self._determine_direction(data)
             
-            # Generate reasoning
-            reasoning = self._generate_signal_reasoning(
-                analysis, direction, strength, confidence
-            )
+            # Calculate confidence and strength
+            confidence = self._calculate_confidence(data, trading_type)
+            strength = self._calculate_strength(data)
+            
+            # Calculate entry and exit prices
+            entry_price = self._calculate_entry_price(price, direction)
+            take_profit = self._calculate_take_profit(entry_price, direction, target_pct)
+            stop_loss = self._calculate_stop_loss(entry_price, direction, stop_pct)
+            
+            # Generate recommendations and analysis details
+            recommendations = self._generate_recommendations(trading_type, direction, price)
+            analysis_details = self._generate_analysis_details(data, trading_type)
             
             return TradingSignal(
                 direction=direction,
                 strength=strength,
                 confidence=confidence,
-                probability=probability,
                 entry_price=entry_price,
                 take_profit=take_profit,
                 stop_loss=stop_loss,
-                timeframe=timeframe,
-                indicators=self._get_relevant_indicators(analysis),
-                reasoning=reasoning
+                recommendations=recommendations,
+                analysis_details=analysis_details
             )
             
         except Exception as e:
-            raise Exception(f"Error generating trading signals: {str(e)}")
+            print(f"Error generating {trading_type} signals: {str(e)}")
+            return None
 
-    def _determine_direction(self, analysis: Dict) -> str:
-        """Determine trading direction based on multiple factors"""
-        signals = []
+    def _determine_direction(self, data: Dict) -> str:
+        change_24h = float(data['change_24h'])
+        return 'long' if change_24h > 0 else 'short'
+
+    def _calculate_confidence(self, data: Dict, trading_type: str) -> float:
+        base_confidence = min(abs(float(data['change_24h'])) * 2, 100)
         
-        # Trend analysis
-        if 'trend' in analysis:
-            signals.append(1 if analysis['trend'] == 'uptrend' else -1)
-            
-        # Moving averages
-        if all(k in analysis for k in ['price', 'sma_50', 'sma_200']):
-            price = analysis['price']
-            sma_50 = analysis['sma_50']
-            sma_200 = analysis['sma_200']
-            signals.append(1 if price > sma_50 > sma_200 else -1)
-            
-        # RSI analysis
-        if 'rsi' in analysis:
-            rsi = analysis['rsi']
-            if rsi < 30:
-                signals.append(1)  # Oversold
-            elif rsi > 70:
-                signals.append(-1)  # Overbought
-                
-        # MACD analysis
-        if 'macd' in analysis and 'macd_signal' in analysis:
-            signals.append(1 if analysis['macd'] > analysis['macd_signal'] else -1)
-            
-        # Volume analysis
-        if 'volume_trend' in analysis:
-            signals.append(1 if analysis['volume_trend'] == 'increasing' else -1)
-            
-        # Support/Resistance
-        if all(k in analysis for k in ['price', 'support_levels', 'resistance_levels']):
-            price = analysis['price']
-            nearest_support = max([s for s in analysis['support_levels'] if s < price], default=0)
-            nearest_resistance = min([r for r in analysis['resistance_levels'] if r > price], default=float('inf'))
-            
-            # Calculate distance to support/resistance as percentage
-            support_distance = (price - nearest_support) / price
-            resistance_distance = (nearest_resistance - price) / price
-            
-            signals.append(1 if support_distance < resistance_distance else -1)
-
-        # Combine signals
-        signal_sum = sum(signals)
-        return 'long' if signal_sum > 0 else 'short'
-    
-    def _calculate_signal_strength(self, analysis: Dict) -> float:
-        """Calculate signal strength (0-1)"""
-        factors = []
+        # Adjust confidence based on trading type
+        adjustments = {
+            'futures': 1.0,
+            'day': 0.9,    # More conservative for day trading
+            'swing': 0.85,  # Even more conservative for swing
+            'position': 0.8 # Most conservative for position
+        }
         
-        # Trend strength
-        if 'trend_strength' in analysis:
-            factors.append(analysis['trend_strength'])
-            
-        # Volume confirmation
-        if 'volume_confirmation' in analysis:
-            factors.append(analysis['volume_confirmation'])
-            
-        # Price momentum
-        if 'momentum' in analysis:
-            factors.append(min(abs(analysis['momentum']) / 100, 1))
-            
-        # Technical indicator alignment
-        if 'indicator_alignment' in analysis:
-            factors.append(analysis['indicator_alignment'])
-            
-        # Market structure
-        if 'market_structure_score' in analysis:
-            factors.append(analysis['market_structure_score'])
-            
-        return np.mean(factors) if factors else 0.5
+        return base_confidence * adjustments.get(trading_type, 1.0)
 
-    def _calculate_confidence(self, analysis: Dict) -> float:
-        """Calculate signal confidence percentage"""
-        confidence_factors = []
+    def _calculate_strength(self, data: Dict) -> float:
+        return min(abs(float(data['change_24h'])) / 10, 1.0)
+
+    def _calculate_entry_price(self, price: float, direction: str) -> float:
+        buffer = 0.002  # 0.2% buffer
+        return price * (1 - buffer if direction == 'long' else 1 + buffer)
+
+    def _calculate_take_profit(self, entry: float, direction: str, target_pct: float) -> float:
+        return entry * (1 + target_pct if direction == 'long' else 1 - target_pct)
+
+    def _calculate_stop_loss(self, entry: float, direction: str, stop_pct: float) -> float:
+        return entry * (1 - stop_pct if direction == 'long' else 1 + stop_pct)
+
+    def _generate_recommendations(self, trading_type: str, direction: str, price: float) -> list:
+        recs = []
         
-        # Trend confirmation
-        if 'trend_confirmation' in analysis:
-            confidence_factors.append(analysis['trend_confirmation'] * 100)
-            
-        # Technical indicator consensus
-        if 'indicator_consensus' in analysis:
-            confidence_factors.append(analysis['indicator_consensus'] * 100)
-            
-        # Volume analysis
-        if 'volume_analysis_confidence' in analysis:
-            confidence_factors.append(analysis['volume_analysis_confidence'] * 100)
-            
-        # Market condition analysis
-        if 'market_condition_score' in analysis:
-            confidence_factors.append(analysis['market_condition_score'] * 100)
-            
-        # Pattern completion
-        if 'pattern_completion' in analysis:
-            confidence_factors.append(analysis['pattern_completion'] * 100)
-            
-        return np.mean(confidence_factors) if confidence_factors else 50.0
-
-    def _calculate_probability(self, analysis: Dict) -> float:
-        """Calculate probability of successful trade"""
-        probabilities = []
+        # Common recommendations
+        recs.append(f"• Consider {direction.upper()} entry near current price")
+        recs.append("• Use proper position sizing")
+        recs.append("• Set stop loss and take profit orders immediately")
         
-        # Historical success rate
-        if 'historical_success_rate' in analysis:
-            probabilities.append(analysis['historical_success_rate'])
+        # Type-specific recommendations
+        if trading_type == 'futures':
+            recs.extend([
+                "• Monitor funding rates",
+                "• Use appropriate leverage",
+                "• Consider scaling in/out",
+                "• Watch for liquidation price",
+                "• Set trailing stops when in profit"
+            ])
+        elif trading_type == 'day':
+            recs.extend([
+                "• Close position before market close",
+                "• Monitor intraday support/resistance",
+                "• Watch for volume spikes",
+                "• Be aware of major news events",
+                "• Use tight stops for intraday trades"
+            ])
+        elif trading_type == 'swing':
+            recs.extend([
+                "• Monitor daily and 4h timeframes",
+                "• Look for clear trend confirmation",
+                "• Consider scaling into position",
+                "• Watch weekly support/resistance",
+                "• Allow for normal market fluctuation"
+            ])
+        else:  # position
+            recs.extend([
+                "• Focus on weekly and monthly trends",
+                "• Consider dollar-cost averaging",
+                "• Monitor fundamental factors",
+                "• Keep wider stops for volatility",
+                "• Plan for multiple take profit levels"
+            ])
             
-        # Pattern success rate
-        if 'pattern_success_rate' in analysis:
-            probabilities.append(analysis['pattern_success_rate'])
-            
-        # Market condition success rate
-        if 'market_condition_success_rate' in analysis:
-            probabilities.append(analysis['market_condition_success_rate'])
-            
-        # Volume profile success rate
-        if 'volume_profile_success_rate' in analysis:
-            probabilities.append(analysis['volume_profile_success_rate'])
-            
-        return np.mean(probabilities) if probabilities else 0.5
+        return recs
 
-    def _calculate_entry_price(self, analysis: Dict) -> float:
-        """Calculate optimal entry price"""
-        current_price = analysis['price']
-        
-        # Calculate entry based on market structure
-        if 'support_levels' in analysis and 'resistance_levels' in analysis:
-            nearest_support = max([s for s in analysis['support_levels'] if s < current_price], default=current_price)
-            nearest_resistance = min([r for r in analysis['resistance_levels'] if r > current_price], default=current_price)
-            
-            # Calculate entry based on support/resistance
-            if analysis.get('signal') == 'long':
-                return (current_price + nearest_support) / 2
-            else:
-                return (current_price + nearest_resistance) / 2
-                
-        return current_price
-
-    def _calculate_take_profit(self, analysis: Dict, direction: str) -> float:
-        """Calculate take profit level"""
-        entry_price = analysis.get('entry_price', analysis['price'])
-        atr = analysis.get('atr', entry_price * 0.02)  # Default to 2% if ATR not available
-        
-        # Consider multiple factors for take profit
-        if direction == 'long':
-            # Find next major resistance
-            if 'resistance_levels' in analysis:
-                next_resistance = min([r for r in analysis['resistance_levels'] if r > entry_price], default=None)
-                if next_resistance:
-                    return next_resistance
-                    
-            # Use ATR multiplier if no clear resistance
-            return entry_price + (atr * 3)
-        else:
-            # Find next major support
-            if 'support_levels' in analysis:
-                next_support = max([s for s in analysis['support_levels'] if s < entry_price], default=None)
-                if next_support:
-                    return next_support
-                    
-            # Use ATR multiplier if no clear support
-            return entry_price - (atr * 3)
-
-    def _calculate_stop_loss(self, analysis: Dict, direction: str) -> float:
-        """Calculate stop loss level"""
-        entry_price = analysis.get('entry_price', analysis['price'])
-        atr = analysis.get('atr', entry_price * 0.02)
-        
-        # Calculate stop loss based on volatility and support/resistance
-        if direction == 'long':
-            # Find closest support
-            if 'support_levels' in analysis:
-                closest_support = max([s for s in analysis['support_levels'] if s < entry_price], default=None)
-                if closest_support:
-                    return min(closest_support, entry_price - (atr * 1.5))
-                    
-            return entry_price - (atr * 1.5)
-        else:
-            # Find closest resistance
-            if 'resistance_levels' in analysis:
-                closest_resistance = min([r for r in analysis['resistance_levels'] if r > entry_price], default=None)
-                if closest_resistance:
-                    return max(closest_resistance, entry_price + (atr * 1.5))
-                    
-            return entry_price + (atr * 1.5)
-
-    def _get_relevant_indicators(self, analysis: Dict) -> Dict:
-        """Get relevant technical indicators for signal"""
+    def _generate_analysis_details(self, data: Dict, trading_type: str) -> dict:
         return {
-            'rsi': analysis.get('rsi'),
-            'macd': analysis.get('macd'),
-            'volume': analysis.get('volume_analysis'),
-            'trend': analysis.get('trend'),
-            'momentum': analysis.get('momentum')
+            'market_trend': 'Bullish' if float(data['change_24h']) > 0 else 'Bearish',
+            'trend_strength': 'Strong' if abs(float(data['change_24h'])) > 5 else 'Moderate',
+            'volatility': 'High' if abs(float(data['change_24h'])) > 10 else 'Normal',
+            'volume_analysis': 'Above Average' if float(data['volume_24h']) > 0 else 'Normal',
+            'trading_type': trading_type.capitalize(),
+            'market_condition': self._analyze_market_condition(data)
         }
 
-    def _generate_signal_reasoning(self, analysis: Dict, direction: str, 
-                                 strength: float, confidence: float) -> List[str]:
-        """Generate reasoning for the trading signal"""
-        reasons = []
-        
-        # Trend-based reasoning
-        if 'trend' in analysis:
-            reasons.append(f"Market is in a {analysis['trend']} trend")
-            
-        # Price action reasoning
-        if 'price_action' in analysis:
-            reasons.append(f"Price action shows {analysis['price_action']}")
-            
-        # Volume analysis
-        if 'volume_analysis' in analysis:
-            reasons.append(f"Volume analysis indicates {analysis['volume_analysis']}")
-            
-        # Technical indicator reasoning
-        if 'rsi' in analysis:
-            rsi = analysis['rsi']
-            if rsi < 30:
-                reasons.append(f"RSI indicates oversold conditions at {rsi:.2f}")
-            elif rsi > 70:
-                reasons.append(f"RSI indicates overbought conditions at {rsi:.2f}")
-                
-        # Market structure reasoning
-        if 'market_structure' in analysis:
-            reasons.append(f"Market structure: {analysis['market_structure']}")
-            
-        # Signal metrics
-        reasons.append(f"Signal strength: {strength:.2f}")
-        reasons.append(f"Confidence level: {confidence:.1f}%")
-        
-        return reasons
+    def _analyze_market_condition(self, data: Dict) -> str:
+        change = abs(float(data['change_24h']))
+        if change > 10:
+            return 'Highly Volatile'
+        elif change > 5:
+            return 'Volatile'
+        elif change > 2:
+            return 'Moderate'
+        else:
+            return 'Stable'

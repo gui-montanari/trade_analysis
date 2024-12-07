@@ -1,26 +1,23 @@
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, 
-                           QLabel, QFrame, QLCDNumber)
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont, QColor
+from PyQt5.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLabel, 
+                           QLCDNumber)
+from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt
 
 class PriceDisplay(QFrame):
     def __init__(self, title: str = "BTC/USDT", parent=None):
         super().__init__(parent)
-        self.title = title
         self.setup_ui()
-        
+
     def setup_ui(self):
-        # Main layout
         layout = QVBoxLayout(self)
-        layout.setSpacing(5)
-        
+
         # Title
-        title_label = QLabel(self.title)
-        title_label.setFont(QFont("Arial", 12, QFont.Bold))
-        title_label.setStyleSheet("color: #FFFFFF;")
-        layout.addWidget(title_label)
-        
-        # Price display
+        self.title_label = QLabel("Bitcoin Price")
+        self.title_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.title_label.setStyleSheet("color: #FFFFFF;")
+        layout.addWidget(self.title_label)
+
+        # Price Display
         self.price_lcd = QLCDNumber(self)
         self.price_lcd.setDigitCount(12)
         self.price_lcd.setSegmentStyle(QLCDNumber.Flat)
@@ -34,14 +31,13 @@ class PriceDisplay(QFrame):
         """)
         self.price_lcd.setMinimumHeight(50)
         layout.addWidget(self.price_lcd)
-        
-        # Change display
-        self.change_label = QLabel("24h Change: 0.00%")
+
+        # Change Label
+        self.change_label = QLabel("24h Change: +0.00%")
         self.change_label.setFont(QFont("Arial", 10))
         self.change_label.setStyleSheet("color: #FFFFFF;")
         layout.addWidget(self.change_label)
-        
-        # Style frame
+
         self.setStyleSheet("""
             QFrame {
                 background-color: #2D2D2D;
@@ -49,34 +45,49 @@ class PriceDisplay(QFrame):
                 padding: 10px;
             }
         """)
-        
-    def update_price(self, price: float, change_24h: float = None):
-        self.price_lcd.display(f"{price:.2f}")
-        
-        if change_24h is not None:
-            color = "#00FF00" if change_24h >= 0 else "#FF0000"
+
+    def update_price(self, price_data):
+        try:
+            if isinstance(price_data, (int, float)):
+                price = float(price_data)
+                change = 0
+            else:
+                price = float(price_data.get('price', 0))
+                change = float(price_data.get('change_24h', 0))
+
+            self.price_lcd.display(f"{price:.2f}")
+            
+            color = "#00FF00" if change >= 0 else "#FF0000"
+            change_text = f"+{change:.2f}%" if change >= 0 else f"{change:.2f}%"
             self.change_label.setStyleSheet(f"color: {color};")
-            self.change_label.setText(f"24h Change: {change_24h:+.2f}%")
+            self.change_label.setText(f"24h Change: {change_text}")
+            
+        except Exception as e:
+            print(f"Error updating price display: {e}")
 
 class DetailedPriceDisplay(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
-        
+
     def setup_ui(self):
         layout = QVBoxLayout(self)
         
-        # Create price displays
-        self.current_price = self._create_price_section("Current")
-        self.high_price = self._create_price_section("24h High")
-        self.low_price = self._create_price_section("24h Low")
-        
-        # Add to layout
-        layout.addWidget(self.current_price)
-        layout.addWidget(self.high_price)
-        layout.addWidget(self.low_price)
-        
-        # Style frame
+        # Title
+        self.title_label = QLabel("Price Details")
+        self.title_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.title_label.setStyleSheet("color: #FFFFFF;")
+        layout.addWidget(self.title_label)
+
+        # Criar seções de preço
+        self.current_price_label = QLabel("Current Price: $0.00")
+        self.high_price_label = QLabel("24h High: $0.00")
+        self.low_price_label = QLabel("24h Low: $0.00")
+
+        for label in [self.current_price_label, self.high_price_label, self.low_price_label]:
+            label.setStyleSheet("color: #FFFFFF; font-size: 14px;")
+            layout.addWidget(label)
+
         self.setStyleSheet("""
             QFrame {
                 background-color: #2D2D2D;
@@ -84,48 +95,42 @@ class DetailedPriceDisplay(QFrame):
                 padding: 15px;
             }
         """)
-        
-    def _create_price_section(self, label: str) -> QFrame:
-        frame = QFrame()
-        layout = QHBoxLayout(frame)
-        
-        title = QLabel(label)
-        title.setFont(QFont("Arial", 10))
-        title.setStyleSheet("color: #AAAAAA;")
-        
-        value = QLabel("$0.00")
-        value.setFont(QFont("Arial", 12, QFont.Bold))
-        value.setStyleSheet("color: #FFFFFF;")
-        
-        layout.addWidget(title)
-        layout.addWidget(value, alignment=Qt.AlignRight)
-        
-        return frame
-        
-    def update_prices(self, current: float, high: float, low: float):
-        self.current_price.findChild(QLabel, "", Qt.FindChildOption.FindChildrenRecursively).setText(f"${current:,.2f}")
-        self.high_price.findChild(QLabel, "", Qt.FindChildOption.FindChildrenRecursively).setText(f"${high:,.2f}")
-        self.low_price.findChild(QLabel, "", Qt.FindChildOption.FindChildrenRecursively).setText(f"${low:,.2f}")
+
+    def update_prices(self, price_data):
+        try:
+            current = price_data.get('price', 0)
+            high = price_data.get('high_24h', 0)
+            low = price_data.get('low_24h', 0)
+
+            self.current_price_label.setText(f"Current Price: ${current:,.2f}")
+            self.high_price_label.setText(f"24h High: ${high:,.2f}")
+            self.low_price_label.setText(f"24h Low: ${low:,.2f}")
+        except Exception as e:
+            print(f"Error updating detailed prices: {e}")
 
 class MarketStatDisplay(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
-        
+
     def setup_ui(self):
         layout = QVBoxLayout(self)
         
-        # Create market stat displays
-        self.volume = self._create_stat_section("24h Volume")
-        self.market_cap = self._create_stat_section("Market Cap")
-        self.dominance = self._create_stat_section("BTC Dominance")
-        
-        # Add to layout
-        layout.addWidget(self.volume)
-        layout.addWidget(self.market_cap)
-        layout.addWidget(self.dominance)
-        
-        # Style frame
+        # Title
+        self.title_label = QLabel("Market Statistics")
+        self.title_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self.title_label.setStyleSheet("color: #FFFFFF;")
+        layout.addWidget(self.title_label)
+
+        # Stats Labels
+        self.volume_label = QLabel("24h Volume: $0.00")
+        self.market_cap_label = QLabel("Market Cap: $0.00")
+        self.dominance_label = QLabel("BTC Dominance: 0.00%")
+
+        for label in [self.volume_label, self.market_cap_label, self.dominance_label]:
+            label.setStyleSheet("color: #FFFFFF; font-size: 14px;")
+            layout.addWidget(label)
+
         self.setStyleSheet("""
             QFrame {
                 background-color: #2D2D2D;
@@ -133,25 +138,15 @@ class MarketStatDisplay(QFrame):
                 padding: 15px;
             }
         """)
-        
-    def _create_stat_section(self, label: str) -> QFrame:
-        frame = QFrame()
-        layout = QHBoxLayout(frame)
-        
-        title = QLabel(label)
-        title.setFont(QFont("Arial", 10))
-        title.setStyleSheet("color: #AAAAAA;")
-        
-        value = QLabel("$0.00")
-        value.setFont(QFont("Arial", 12))
-        value.setStyleSheet("color: #FFFFFF;")
-        
-        layout.addWidget(title)
-        layout.addWidget(value, alignment=Qt.AlignRight)
-        
-        return frame
-        
-    def update_stats(self, volume: float, market_cap: float, dominance: float):
-        self.volume.findChild(QLabel, "", Qt.FindChildOption.FindChildrenRecursively).setText(f"${volume:,.0f}")
-        self.market_cap.findChild(QLabel, "", Qt.FindChildOption.FindChildrenRecursively).setText(f"${market_cap:,.0f}")
-        self.dominance.findChild(QLabel, "", Qt.FindChildOption.FindChildrenRecursively).setText(f"{dominance:.2f}%")
+
+    def update_stats(self, price_data):
+        try:
+            volume = price_data.get('volume_24h', 0)
+            market_cap = price_data.get('market_cap', 0)
+            dominance = price_data.get('btc_dominance', 0)
+
+            self.volume_label.setText(f"24h Volume: ${volume:,.2f}")
+            self.market_cap_label.setText(f"Market Cap: ${market_cap:,.2f}")
+            self.dominance_label.setText(f"BTC Dominance: {dominance:.2f}%")
+        except Exception as e:
+            print(f"Error updating market stats: {e}")
