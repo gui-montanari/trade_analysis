@@ -28,7 +28,7 @@ class MainController:
         # Setup update timer
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update_all_data)
-        self.update_timer.start(10000)  # Update every 10 seconds
+        self.update_timer.start(60000)  # Update every 10 seconds
         
         # Initial data fetch and analysis
         self.update_all_data()

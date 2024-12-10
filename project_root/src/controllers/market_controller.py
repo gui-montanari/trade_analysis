@@ -14,7 +14,7 @@ class MarketController:
         self.sentiment_analysis = SentimentAnalysis()
         self.cached_analysis = {}
         self.last_update = None
-        self.update_interval = 60  # seconds
+        self.update_interval = 50  # seconds
 
     def get_market_data(self, timeframe: str = 'current') -> Dict:
         """

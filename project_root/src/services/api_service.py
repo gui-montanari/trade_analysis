@@ -42,7 +42,7 @@ class APIService:
         params = {
             "vs_currency": "usd",
             "days": days,
-            "interval": "daily"
+            "interval": "daily"  # Sempre usar intervalo diário
         }
         return self._make_request('market_chart', params)
 
@@ -93,19 +93,51 @@ class APIService:
             price_data = self.get_current_price()
             global_data = self.get_global_market_data()
             
-            return {
+            # Calcular a variação do volume usando apenas os dados atuais
+            previous_data = self._get_cached_overview()
+            volume_change = 0
+            
+            if previous_data and 'volume_24h' in previous_data and previous_data['volume_24h'] > 0:
+                current_volume = price_data.get('total_volume', 0)
+                previous_volume = previous_data['volume_24h']
+                if previous_volume > 0:
+                    volume_change = ((current_volume - previous_volume) / previous_volume) * 100
+            
+            overview = {
                 "price": price_data["usd"],
                 "change_24h": price_data.get("usd_24h_change", 0),
-                "volume_24h": price_data.get("usd_24h_vol", 0),
+                "volume_24h": price_data.get("total_volume", 0),
+                "volume_change_24h": volume_change,
                 "market_cap": price_data.get("usd_market_cap", 0),
                 "market_dominance": global_data.get("bitcoin_dominance", 0),
                 "global_market_cap": global_data.get("total_market_cap", {}).get("usd", 0),
                 "last_updated": datetime.now().isoformat()
             }
             
+            # Salva o overview atual no cache
+            self._save_cached_overview(overview)
+            
+            return overview
+            
         except Exception as e:
             logging.error(f"Error getting market overview: {str(e)}")
             raise
+
+    def _get_cached_overview(self) -> Dict:
+        """Load cached market overview"""
+        try:
+            with open('market_overview_cache.json', 'r') as f:
+                return json.load(f)
+        except:
+            return {}
+
+    def _save_cached_overview(self, data: Dict):
+        """Save market overview to cache"""
+        try:
+            with open('market_overview_cache.json', 'w') as f:
+                json.dump(data, f)
+        except Exception as e:
+            logging.error(f"Error saving market overview cache: {str(e)}")
 
     def get_technical_data(self) -> Dict:
         """Get technical analysis data"""

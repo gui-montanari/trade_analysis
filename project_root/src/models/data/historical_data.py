@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 import json
 import os
+import time
 
 class HistoricalDataManager:
     def __init__(self):
@@ -14,6 +15,8 @@ class HistoricalDataManager:
         self.cache_dir = Path("cache")
         self.cache_file = self.cache_dir / "historical_data.json"
         self.max_cache_age = timedelta(hours=1)
+        self._last_api_call = {}
+        self._api_call_limit = 30  # 30 segundos entre chamadas
         
         # Create cache directory if it doesn't exist
         self.cache_dir.mkdir(exist_ok=True)
@@ -34,9 +37,16 @@ class HistoricalDataManager:
         try:
             # Check if we have valid cached data
             if self._is_cache_valid(days):
+                logging.info("Using cached historical data")
                 return self._get_cached_data(days)
             
-            # Fetch new data if cache is invalid
+            if not self._can_make_request('historical'):
+                if self.cached_data:
+                    logging.warning("Rate limit hit, returning cached data")
+                    return self._get_cached_data(days)
+                raise Exception("Rate limit hit and no cache available")
+
+            # Fetch new data
             data = self._fetch_historical_data(days)
             
             # Update cache
@@ -56,11 +66,17 @@ class HistoricalDataManager:
     def get_recent_data(self, days: int = 30) -> List[Dict]:
         """Get recent historical data with higher granularity"""
         try:
+            if not self._can_make_request('recent'):
+                cached_data = self._get_cached_recent_data(days)
+                if cached_data:
+                    logging.info("Using cached recent data")
+                    return cached_data
+                raise Exception("Rate limit hit and no recent cache available")
+
             url = f"{self.base_url}/coins/bitcoin/market_chart"
             params = {
                 "vs_currency": "usd",
-                "days": days,
-                "interval": "hourly"
+                "days": str(days)
             }
             
             response = requests.get(url, params=params, timeout=10)
@@ -82,10 +98,16 @@ class HistoricalDataManager:
                     "market_cap": market_cap[1]
                 })
             
+            # Cache the recent data
+            self._update_recent_cache(processed_data)
+            
             return processed_data
             
         except Exception as e:
             logging.error(f"Error fetching recent data: {str(e)}")
+            cached_data = self._get_cached_recent_data(days)
+            if cached_data:
+                return cached_data
             raise
 
     def get_price_history(self, start_date: datetime, end_date: datetime) -> pd.DataFrame:
@@ -99,7 +121,7 @@ class HistoricalDataManager:
         Returns:
             DataFrame with historical price data
         """
-        days = (end_date - start_date).days
+        days = (end_date - start_date).days + 1
         data = self.get_historical_data(days)
         
         # Convert to DataFrame
@@ -135,7 +157,7 @@ class HistoricalDataManager:
         url = f"{self.base_url}/coins/bitcoin/market_chart"
         params = {
             "vs_currency": "usd",
-            "days": days,
+            "days": str(days),
             "interval": "daily"
         }
         
@@ -176,7 +198,8 @@ class HistoricalDataManager:
         try:
             cache_data = {
                 "last_update": datetime.now().isoformat(),
-                "data": data
+                "data": data,
+                "recent_data": self.cached_data.get("recent_data", [])
             }
             
             with open(self.cache_file, 'w') as f:
@@ -184,6 +207,15 @@ class HistoricalDataManager:
                 
         except Exception as e:
             logging.error(f"Error updating cache: {str(e)}")
+
+    def _update_recent_cache(self, data: List[Dict]):
+        """Update recent data cache"""
+        try:
+            self.cached_data["recent_data"] = data
+            self.cached_data["recent_update"] = datetime.now().isoformat()
+            self._update_cache(self.cached_data.get("data", []))
+        except Exception as e:
+            logging.error(f"Error updating recent cache: {str(e)}")
 
     def _is_cache_valid(self, days: int) -> bool:
         """Check if cached data is valid"""
@@ -201,6 +233,28 @@ class HistoricalDataManager:
     def _get_cached_data(self, days: int) -> List[Dict]:
         """Get data from cache"""
         return self.cached_data.get("data", [])[-days:]
+
+    def _get_cached_recent_data(self, days: int) -> Optional[List[Dict]]:
+        """Get recent data from cache"""
+        if not self.cached_data.get("recent_data"):
+            return None
+            
+        recent_update = datetime.fromisoformat(self.cached_data.get("recent_update", ""))
+        if datetime.now() - recent_update > self.max_cache_age:
+            return None
+            
+        return self.cached_data["recent_data"]
+
+    def _can_make_request(self, endpoint: str) -> bool:
+        """Check if we can make an API request (rate limiting)"""
+        current_time = time.time()
+        last_call = self._last_api_call.get(endpoint, 0)
+        
+        if current_time - last_call < self._api_call_limit:
+            return False
+            
+        self._last_api_call[endpoint] = current_time
+        return True
 
     def clear_cache(self):
         """Clear cached data"""

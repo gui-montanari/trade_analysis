@@ -13,7 +13,7 @@ class PriceDisplay(QFrame):
         # Title
         self.title_label = QLabel("Bitcoin Price")
         self.title_label.setFont(QFont("Arial", 12, QFont.Bold))
-        self.title_label.setStyleSheet("color: #FFFFFF;")
+        self.title_label.setStyleSheet("color: #333333;")
         layout.addWidget(self.title_label)
 
         # Price Display
@@ -22,7 +22,7 @@ class PriceDisplay(QFrame):
         self.price_lcd.setSegmentStyle(QLCDNumber.Flat)
         self.price_lcd.setStyleSheet("""
             QLCDNumber {
-                background-color: #1E1E1E;
+                background-color: #2D2D2D;
                 color: #00FF00;
                 border: 2px solid #333333;
                 border-radius: 5px;
@@ -34,12 +34,12 @@ class PriceDisplay(QFrame):
         # Change Label
         self.change_label = QLabel("24h Change: +0.00%")
         self.change_label.setFont(QFont("Arial", 10))
-        self.change_label.setStyleSheet("color: #FFFFFF;")
+        self.change_label.setStyleSheet("color: #333333;")
         layout.addWidget(self.change_label)
 
         self.setStyleSheet("""
             QFrame {
-                background-color: #2D2D2D;
+                background-color: #FFFFFF;
                 border-radius: 10px;
                 padding: 10px;
             }
@@ -56,7 +56,7 @@ class PriceDisplay(QFrame):
 
             self.price_lcd.display(f"{price:.2f}")
             
-            color = "#00FF00" if change >= 0 else "#FF0000"
+            color = "#00C853" if change >= 0 else "#D50000"
             change_text = f"+{change:.2f}%" if change >= 0 else f"{change:.2f}%"
             self.change_label.setStyleSheet(f"color: {color};")
             self.change_label.setText(f"24h Change: {change_text}")
@@ -74,12 +74,10 @@ class DetailedPriceDisplay(QFrame):
         layout.setSpacing(15)
         layout.setContentsMargins(15, 15, 15, 15)
         
-        # Container for price information
         price_container = QFrame()
         price_layout = QVBoxLayout(price_container)
         price_layout.setSpacing(10)
         
-        # Price information labels
         self.current_price_label = self._create_info_label("Current Price: $0.00")
         self.high_price_label = self._create_info_label("24h High: $0.00")
         self.low_price_label = self._create_info_label("24h Low: $0.00")
@@ -88,7 +86,6 @@ class DetailedPriceDisplay(QFrame):
         price_layout.addWidget(self.high_price_label)
         price_layout.addWidget(self.low_price_label)
         
-        # Set size policies
         price_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         
@@ -96,12 +93,12 @@ class DetailedPriceDisplay(QFrame):
         
         self.setStyleSheet("""
             QFrame {
-                background-color: #2D2D2D;
-                border: 1px solid #333333;
+                background-color: #FFFFFF;
+                border: 1px solid #E0E0E0;
                 border-radius: 10px;
             }
             QLabel {
-                color: #FFFFFF;
+                color: #333333;
                 font-size: 14px;
                 padding: 5px;
                 qproperty-wordWrap: true;
@@ -113,7 +110,7 @@ class DetailedPriceDisplay(QFrame):
         label.setWordWrap(True)
         label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         label.setStyleSheet("""
-            color: #FFFFFF;
+            color: #333333;
             font-size: 14px;
             padding: 5px;
             qproperty-wordWrap: true;
@@ -136,30 +133,27 @@ class MarketStatDisplay(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
+        self._previous_volume = None
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
         layout.setContentsMargins(15, 15, 15, 15)
         
-        # Container for market statistics
         stats_container = QFrame()
         stats_layout = QVBoxLayout(stats_container)
         stats_layout.setSpacing(10)
         
-        # Market statistics labels
         self.volume_label = self._create_info_label("24h Volume: $0.00")
         self.volume_change_label = self._create_info_label("24h Volume Change: 0.00%")
         self.market_cap_label = self._create_info_label("Market Cap: $0.00")
         self.dominance_label = self._create_info_label("BTC Dominance: 0.00%")
 
-        # Add labels to layout na ordem correta
         stats_layout.addWidget(self.volume_label)
         stats_layout.addWidget(self.volume_change_label)
         stats_layout.addWidget(self.market_cap_label)
         stats_layout.addWidget(self.dominance_label)
         
-        # Set size policies
         stats_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         
@@ -167,12 +161,12 @@ class MarketStatDisplay(QFrame):
 
         self.setStyleSheet("""
             QFrame {
-                background-color: #2D2D2D;
-                border: 1px solid #333333;
+                background-color: #FFFFFF;
+                border: 1px solid #E0E0E0;
                 border-radius: 10px;
             }
             QLabel {
-                color: #FFFFFF;
+                color: #333333;
                 font-size: 14px;
                 padding: 5px;
                 qproperty-wordWrap: true;
@@ -184,7 +178,7 @@ class MarketStatDisplay(QFrame):
         label.setWordWrap(True)
         label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         label.setStyleSheet("""
-            color: #FFFFFF;
+            color: #333333;
             font-size: 14px;
             padding: 5px;
             qproperty-wordWrap: true;
@@ -194,19 +188,32 @@ class MarketStatDisplay(QFrame):
     def update_stats(self, price_data: dict):
         try:
             volume = price_data.get('volume_24h', 0)
-            volume_change = price_data.get('volume_change_24h', 0)  # Novo campo para variação do volume
             market_cap = price_data.get('market_cap', 0)
             dominance = price_data.get('btc_dominance', 0)
+
+            # Cálculo da variação do volume
+            if self._previous_volume is not None and self._previous_volume > 0:
+                volume_change = ((volume - self._previous_volume) / self._previous_volume) * 100
+            else:
+                volume_change = 0
+            
+            self._previous_volume = volume
 
             self.volume_label.setText(f"24h Volume: ${volume:,.2f}")
             
             # Formata a variação do volume com cor e sinal
-            color = "#00FF00" if volume_change >= 0 else "#FF0000"
+            color = "#00C853" if volume_change >= 0 else "#D50000"
             change_text = f"+{volume_change:.2f}%" if volume_change >= 0 else f"{volume_change:.2f}%"
-            self.volume_change_label.setStyleSheet(f"color: {color}; font-size: 14px; padding: 5px;")
+            self.volume_change_label.setStyleSheet(f"""
+                color: {color};
+                font-size: 14px;
+                padding: 5px;
+                font-weight: bold;
+            """)
             self.volume_change_label.setText(f"24h Volume Change: {change_text}")
             
             self.market_cap_label.setText(f"Market Cap: ${market_cap:,.2f}")
             self.dominance_label.setText(f"BTC Dominance: {dominance:.2f}%")
+            
         except Exception as e:
             print(f"Error updating market stats: {e}")
