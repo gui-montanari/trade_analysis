@@ -106,6 +106,7 @@ class DetailedPriceDisplay(QFrame):
         """)
 
     def _create_info_label(self, text: str) -> QLabel:
+        """Create better formatted info labels"""
         label = QLabel(text)
         label.setWordWrap(True)
         label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
@@ -114,6 +115,7 @@ class DetailedPriceDisplay(QFrame):
             font-size: 14px;
             padding: 5px;
             qproperty-wordWrap: true;
+            min-width: 200px;  /* Garante largura mínima */
         """)
         return label
 
@@ -148,17 +150,19 @@ class MarketStatDisplay(QFrame):
         self.volume_change_label = self._create_info_label("24h Volume Change: 0.00%")
         self.market_cap_label = self._create_info_label("Market Cap: $0.00")
         self.dominance_label = self._create_info_label("BTC Dominance: 0.00%")
-
+        self.direction_label = self._create_info_label("Direction: --")  # Novo label
+        
         stats_layout.addWidget(self.volume_label)
         stats_layout.addWidget(self.volume_change_label)
         stats_layout.addWidget(self.market_cap_label)
         stats_layout.addWidget(self.dominance_label)
+        stats_layout.addWidget(self.direction_label)  # Adiciona o novo label
         
         stats_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         
         layout.addWidget(stats_container)
-
+        
         self.setStyleSheet("""
             QFrame {
                 background-color: #FFFFFF;
@@ -185,23 +189,19 @@ class MarketStatDisplay(QFrame):
         """)
         return label
 
-    def update_stats(self, price_data: dict):
+    def update_stats(self, data: dict):
+        """Update market stats with better formatting"""
         try:
-            volume = price_data.get('volume_24h', 0)
-            market_cap = price_data.get('market_cap', 0)
-            dominance = price_data.get('btc_dominance', 0)
+            volume = data.get('volume_24h', 0)
+            volume_change = data.get('volume_change_24h', 0)
+            market_cap = data.get('market_cap', 0)
+            dominance = data.get('btc_dominance', 0)
+            direction = data.get('direction', '--')  # Pega a direção dos dados
 
-            # Cálculo da variação do volume
-            if self._previous_volume is not None and self._previous_volume > 0:
-                volume_change = ((volume - self._previous_volume) / self._previous_volume) * 100
-            else:
-                volume_change = 0
-            
-            self._previous_volume = volume
-
+            # Volume Display
             self.volume_label.setText(f"24h Volume: ${volume:,.2f}")
             
-            # Formata a variação do volume com cor e sinal
+            # Volume Change Display
             color = "#00C853" if volume_change >= 0 else "#D50000"
             change_text = f"+{volume_change:.2f}%" if volume_change >= 0 else f"{volume_change:.2f}%"
             self.volume_change_label.setStyleSheet(f"""
@@ -209,11 +209,24 @@ class MarketStatDisplay(QFrame):
                 font-size: 14px;
                 padding: 5px;
                 font-weight: bold;
+                min-width: 200px;
             """)
-            self.volume_change_label.setText(f"24h Volume Change: {change_text}")
+            self.volume_change_label.setText(f"Volume Change: {change_text}")
             
+            # Market Cap and Dominance
             self.market_cap_label.setText(f"Market Cap: ${market_cap:,.2f}")
             self.dominance_label.setText(f"BTC Dominance: {dominance:.2f}%")
             
+            # Direction Display
+            direction_color = "#00C853" if direction == "LONG" else "#D50000" if direction == "SHORT" else "#666666"
+            self.direction_label.setStyleSheet(f"""
+                color: {direction_color};
+                font-size: 14px;
+                padding: 5px;
+                font-weight: bold;
+                min-width: 200px;
+            """)
+            self.direction_label.setText(f"Direction: {direction}")
+                    
         except Exception as e:
             print(f"Error updating market stats: {e}")

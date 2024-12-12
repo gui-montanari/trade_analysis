@@ -8,6 +8,8 @@ from ..models.data.market_data import MarketDataModel
 from ..services.risk_manager import RiskManager
 from ..services.signal_generator import SignalGenerator
 from datetime import datetime
+from ..services.signal_cache_manager import SignalCacheManager  # Nova importação
+
 
 class MainController:
     def __init__(self):
@@ -21,6 +23,8 @@ class MainController:
         # Initialize services
         self.risk_manager = RiskManager()
         self.signal_generator = SignalGenerator()
+        self.signal_cache = SignalCacheManager()  # Add this line
+
         
         # Create main window
         self.main_window = MainWindow(self)
@@ -205,7 +209,7 @@ class MainController:
                         result += f"{indicator.title()}: {value}\n"
             result += "\n"
         
-        # Signal and Entry Points
+        # Trading Signal (Current)
         if signal:
             result += "TRADING SIGNAL\n"
             if hasattr(signal, 'direction'):
@@ -219,6 +223,39 @@ class MainController:
             if hasattr(signal, 'confidence'):
                 result += f"Confidence: {signal.confidence:.1f}%\n"
             result += "\n"
+            
+            # Get first signal from cache for separate section
+            trading_type = analysis_type.lower().split()[0]  # 'futures', 'day', 'swing', 'position'
+            first_signal = self.signal_cache.get_first_signal(trading_type)
+            
+            # First Trading Signal as separate section
+            if first_signal and first_signal['direction'] == signal.direction.upper():
+                result += "FIRST TRADING SIGNAL\n"
+                result += f"Direction: {first_signal['direction'].upper()}\n"
+                result += f"Entry Price: ${first_signal['entry_price']:,.2f}\n"
+                result += f"Take Profit: ${first_signal['take_profit']:,.2f}\n"
+                result += f"Stop Loss: ${first_signal['stop_loss']:,.2f}\n"
+                result += f"Confidence: {first_signal['confidence']:.1f}%\n"
+                result += f"First Signal Time: {datetime.fromisoformat(first_signal['timestamp']).strftime('%Y-%m-%d %H:%M:%S')}\n"
+                
+                # Calculate price difference from first signal
+                if hasattr(signal, 'entry_price') and first_signal['entry_price'] > 0:
+                    price_diff = ((signal.entry_price - first_signal['entry_price']) / first_signal['entry_price']) * 100
+                    result += f"Price Change Since First Signal: {price_diff:+.2f}%\n"
+                result += "\n"
+            
+            # Update signal cache if needed
+            if hasattr(signal, 'direction'):
+                self.signal_cache.update_signal(
+                    trading_type,
+                    {
+                        'entry_price': getattr(signal, 'entry_price', 0),
+                        'take_profit': getattr(signal, 'take_profit', 0),
+                        'stop_loss': getattr(signal, 'stop_loss', 0),
+                        'confidence': getattr(signal, 'confidence', 0)
+                    },
+                    signal.direction.upper()
+                )
         
         # Risk Assessment
         if risk:

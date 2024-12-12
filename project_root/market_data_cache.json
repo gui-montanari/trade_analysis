@@ -1,13 +1,13 @@
 {
-  "price": 96589,
-  "change_24h": 0.40183,
-  "volume_24h": 159868604551,
+  "price": 100589,
+  "change_24h": 2.15722,
+  "volume_24h": 79667632845,
   "previous_volume_24h": 159868604551,
-  "volume_change_24h": 0.0603956050099668,
-  "market_cap": 1912734740165,
-  "high_24h": 98328,
-  "low_24h": 94387,
-  "btc_dominance": 53.30086646416058,
-  "last_updated": "2024-12-10T17:57:53.738301",
-  "volume_last_updated": "2024-12-10T14:44:28.589174"
+  "volume_change_24h": -50.166805378234805,
+  "market_cap": 1990646783042,
+  "high_24h": 101961,
+  "low_24h": 98192,
+  "btc_dominance": 52.312809516743144,
+  "last_updated": "2024-12-12T09:21:47.528887",
+  "volume_last_updated": "2024-12-11T14:45:14.924726"
 }

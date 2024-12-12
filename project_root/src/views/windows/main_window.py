@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                            QFrame, QLabel, QStackedWidget, QSplitter,
                            QPushButton, QTabWidget, QSizePolicy, QGroupBox,
-                           QTextEdit)
+                           QTextEdit, QScrollArea)
 from PyQt5.QtCore import Qt, QTimer, QTime
 from PyQt5.QtGui import QFont
 from datetime import datetime
@@ -292,20 +292,48 @@ class MainWindow(QMainWindow):
                 background-color: #FFFFFF;
                 border: 1px solid #E0E0E0;
                 border-radius: 10px;
-                padding: 15px;
             }
         """)
-        layout = QVBoxLayout(container)
-        layout.setSpacing(15)
+        
+        # Criar um QScrollArea para permitir rolagem
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background-color: transparent;
+            }
+            QScrollBar:vertical {
+                background: #F0F0F0;
+                width: 10px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #CCCCCC;
+                min-height: 20px;
+                border-radius: 5px;
+            }
+            QScrollBar::add-line:vertical {
+                height: 0px;
+            }
+            QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
 
-        # Trading Signal Section - Maior altura
+        content_widget = QWidget()
+        layout = QVBoxLayout(content_widget)
+        layout.setSpacing(15)
+        layout.setContentsMargins(15, 15, 15, 15)
+
+        # Trading Signal Section
         signal_group = self._create_analysis_group("Trading Signal")
         self.signal_content = QTextEdit()
         self.signal_content.setReadOnly(True)
-        self.signal_content.setMinimumHeight(250)  # Aumentado
+        self.signal_content.setMinimumHeight(200)
         self.signal_content.setStyleSheet("""
             QTextEdit {
-                background-color: #F8F9FA;
+                background-color: transparent;
                 border: none;
                 padding: 10px;
                 color: #333333;
@@ -321,10 +349,10 @@ class MainWindow(QMainWindow):
         risk_group = self._create_analysis_group("Risk Assessment")
         self.risk_content = QTextEdit()
         self.risk_content.setReadOnly(True)
-        self.risk_content.setMinimumHeight(200)  # Aumentado
+        self.risk_content.setMinimumHeight(180)
         self.risk_content.setStyleSheet("""
             QTextEdit {
-                background-color: #F8F9FA;
+                background-color: transparent;
                 border: none;
                 padding: 10px;
                 color: #333333;
@@ -340,10 +368,10 @@ class MainWindow(QMainWindow):
         rec_group = self._create_analysis_group("Recommendations")
         self.rec_content = QTextEdit()
         self.rec_content.setReadOnly(True)
-        self.rec_content.setMinimumHeight(200)  # Aumentado
+        self.rec_content.setMinimumHeight(180)
         self.rec_content.setStyleSheet("""
             QTextEdit {
-                background-color: #F8F9FA;
+                background-color: transparent;
                 border: none;
                 padding: 10px;
                 color: #333333;
@@ -354,6 +382,14 @@ class MainWindow(QMainWindow):
         """)
         rec_group.layout().addWidget(self.rec_content)
         layout.addWidget(rec_group)
+
+        # Set scroll area content
+        scroll_area.setWidget(content_widget)
+        
+        # Main container layout
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.addWidget(scroll_area)
 
         return container
 
@@ -527,6 +563,12 @@ class MainWindow(QMainWindow):
     def update_price_display(self, data: dict):
         """Update all displays with new data"""
         try:
+            # Adiciona a direção aos dados do mercado
+            if hasattr(self.controller, 'signal_generator'):
+                signal = self.controller.signal_generator.generate_futures_signals(data)
+                if signal and hasattr(signal, 'direction'):
+                    data['direction'] = signal.direction.upper()
+            
             if hasattr(self, 'price_display'):
                 self.price_display.update_price(data)
             if hasattr(self, 'detailed_price'):
@@ -542,6 +584,9 @@ class MainWindow(QMainWindow):
             # Update status
             if hasattr(self, 'status_label'):
                 self.status_label.setText(f"Last update: {datetime.now().strftime('%H:%M:%S')}")
+                
+        except Exception as e:
+            self.show_error(f"Error updating displays: {str(e)}")
                 
         except Exception as e:
             self.show_error(f"Error updating displays: {str(e)}")
@@ -613,22 +658,30 @@ class MainWindow(QMainWindow):
             # Separar o texto da análise em suas seções
             sections = analysis_text.split('\n\n')
             
-            # Trading Signal
+            # Inicializar textos para cada seção
             signal_text = ""
+            first_signal_text = ""  # Nova variável para First Trading Signal
             risk_text = ""
             rec_text = ""
             
             for section in sections:
-                if "TRADING SIGNAL" in section:
+                if "TRADING SIGNAL" in section and "FIRST TRADING SIGNAL" not in section:
                     signal_text = section
+                elif "FIRST TRADING SIGNAL" in section:  # Nova condição
+                    first_signal_text = section
                 elif "RISK ASSESSMENT" in section:
                     risk_text = section
                 elif "RECOMMENDATIONS" in section:
                     rec_text = section
             
+            # Combinar Trading Signal e First Trading Signal
+            combined_signal_text = signal_text
+            if first_signal_text:
+                combined_signal_text += "\n\n" + first_signal_text
+            
             # Atualizar os campos de texto correspondentes
             if hasattr(self, 'signal_content'):
-                self.signal_content.setText(signal_text)
+                self.signal_content.setText(combined_signal_text)
                 self.signal_content.verticalScrollBar().setValue(0)
                 
             if hasattr(self, 'risk_content'):
